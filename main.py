@@ -1,14 +1,16 @@
+import os
+import sys
+import time
+import ctypes
 import requests
 import threading
-from flask import Flask, request, jsonify, Response
-from pyngrok import ngrok, conf
-import time
-from flask_cors import CORS
-from dotenv import load_dotenv
-import os
-from urllib.parse import urlparse, parse_qs
-from pytube import YouTube
 import keyboard
+from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qs
+from pyngrok import ngrok, conf
+from pytube import YouTube
+from flask import Flask, request, jsonify, Response
+from flask_cors import CORS
 
 
 load_dotenv()
@@ -52,9 +54,14 @@ def run_ngrok(): #ngrok для создания туннеля на наш ай�
     public_url = ngrok_tunnel.public_url
     json_data['transport']['callback'] = f"{public_url}/webhook"
     print(f"ngrok tunnel {public_url} -> http://127.0.0.1:{port}")
-    #ngrok_tunnel.proc.wait()
     while True:
         time.sleep(10)
+
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
 
 def clear_previous_subs():
     url = "https://api.twitch.tv/helix/eventsub/subscriptions"
@@ -173,8 +180,17 @@ def trigger_post_request():
     req = requests.post(url, headers=headers, json=json_data)
     return jsonify({"status": req.status_code, "data": req.json()})
 
+# что-бы скрипт не закрылся мгновенно
+os.system("pause")
 
 if __name__=='__main__':
+    if is_admin():
+        pass
+    else:
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", sys.executable, __file__, None, 1
+        )
+        exit()
     clear_previous_subs()
     ngrok_thread = threading.Thread(target=run_ngrok)
     ngrok_thread.start()
