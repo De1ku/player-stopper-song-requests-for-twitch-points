@@ -17,6 +17,7 @@ load_dotenv()
 
 video_queue = []
 switcher = False
+is_currently_played = False
 port = 11097
 access_token = os.environ.get("CHANNEL_ACCESS_TOKEN")
 client_access_token = os.environ.get("CLIENT_ACCESS_TOKEN")
@@ -102,6 +103,14 @@ def send_play_pause():
     keyboard.send('play/pause')
     print("Команда play/pause отправлена")
 
+def send_play_pause_timer():
+    global switcher
+    global is_currently_played
+    keyboard.send('play/pause')
+    print("Команда play/pause отправлена")
+    switcher = False
+    is_currently_played = False
+
 def skip_song_from_queue():
     global queue_thread
     global switcher
@@ -112,17 +121,21 @@ def skip_song_from_queue():
         switcher = False
         cancel_timer()
         send_play_pause()
+        is_currently_played = False
     else:
         pass
     print('Песня была пропущена')
 
 def start_timer(timer):
+    global start_timer_time
     if not timer.is_alive():
         timer.start()
         print("Таймер запущен")
+        start_timer_time = time.time()
 
 def cancel_timer():
     global timer
+    global is_currently_played
     if timer.is_alive():
         timer.cancel()
         print("Таймер отменён")
@@ -131,23 +144,28 @@ def queue_manager() -> None:
     global video_queue
     global switcher
     global timer
+    global is_currently_played
+    global start_timer_time
+    global end_timer_time
     print("Поток queue_manager был запушен")
+    timer = threading.Timer(1, send_play_pause_timer)
     while True:
-        if video_queue:
-            send_play_pause()
-            print("Воспроизведение было приостановлено")
+        if video_queue and switcher == False:
             switcher = True
-            time_to_sleep = video_queue[0]
-            video_queue.pop(0)
-            timer = threading.Timer(time_to_sleep+0.5, send_play_pause)
-            start_timer(timer)
-            switcher = False
-        else:
-            if switcher:
-                switcher = False
+            time_to_sleep = video_queue[0]+0.5
+            if not is_currently_played:
                 send_play_pause()
+                is_currently_played = True
+                print("Воспроизведение было приостановлено")
             else:
-                pass
+                end_timer_time = time.time()
+                time_to_sleep = (end_timer_time - start_timer_time)+time_to_sleep
+            video_queue.pop(0)
+            timer = threading.Timer(time_to_sleep, send_play_pause_timer)
+            start_timer(timer)
+        else:
+            if not timer.is_alive():
+                switcher = False
         time.sleep(0.5)
 
 
@@ -158,6 +176,8 @@ def webhook():
     data = request.json
     print("Request from Twitch: ", data)
     global video_queue
+    global timer
+    global is_currently_played
 
     if data['subscription']['status'] == 'webhook_callback_verification_pending':
         challenge = data['challenge']
@@ -169,6 +189,8 @@ def webhook():
         song_request_url = data['event']['user_input']
         duration = get_video_length(song_request_url)
         if duration:
+            if timer.is_alive():
+                cancel_timer()
             video_queue.append(duration)
         else:
             print("Ссылка не ведет на действительное Youtube видео")
@@ -196,5 +218,5 @@ if __name__=='__main__':
     ngrok_thread.start()
     queue_thread = threading.Thread(target=queue_manager)
     queue_thread.start()
-    keyboard.add_hotkey('ctrl+shift+.', skip_song_from_queue, suppress=True, trigger_on_release=True)
+    keyboard.add_hotkey('alt+.', skip_song_from_queue, suppress=True, trigger_on_release=True)
     app.run(port=port, debug=True)
