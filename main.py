@@ -159,7 +159,7 @@ def queue_manager() -> None:
                 print("Воспроизведение было приостановлено")
             else:
                 end_timer_time = time.time()
-                time_to_sleep = (end_timer_time - start_timer_time)+time_to_sleep
+                time_to_sleep = (timer.interval-(end_timer_time - start_timer_time))+time_to_sleep
             video_queue.pop(0)
             timer = threading.Timer(time_to_sleep, send_play_pause_timer)
             start_timer(timer)
