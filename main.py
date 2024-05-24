@@ -218,5 +218,5 @@ if __name__=='__main__':
     ngrok_thread.start()
     queue_thread = threading.Thread(target=queue_manager)
     queue_thread.start()
-    keyboard.add_hotkey('alt+.', skip_song_from_queue, suppress=True, trigger_on_release=True)
+    keyboard.add_hotkey(']', skip_song_from_queue, suppress=True, trigger_on_release=True)
     app.run(port=port, debug=True)
